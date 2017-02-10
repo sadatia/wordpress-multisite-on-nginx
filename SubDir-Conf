@@ -1,0 +1,76 @@
+
+
+map $uri $blogname{
+    ~^(?P<blogpath>/[^/]+/)files/(.*)   $blogpath ;
+}
+map $blogname $blogid{
+    default -999;
+    #Ref: http://wordpress.org/extend/plugins/nginx-helper/
+    #include /var/www/wordpress/wp-content/plugins/nginx-helper/map.conf ;
+}
+
+server {
+  server_name newsandnumbers.com www.newsandnumbers.com;
+
+# ngx_pagespeed & ngx_pagespeed handler
+#include /usr/local/nginx/conf/pagespeed.conf;
+#include /usr/local/nginx/conf/pagespeedhandler.conf;
+#include /usr/local/nginx/conf/pagespeedstatslog.conf;
+
+  # limit_conn limit_per_ip 16;
+  # ssi  on;
+
+  access_log /home/nginx/domains/newsandnumbers.com/log/access.log combined buffer=256k flush=60m;
+  error_log /home/nginx/domains/newsandnumbers.com/log/error.log;
+
+  root /home/nginx/domains/newsandnumbers.com/public;
+
+  # prevent access to ./directories and files
+  location ~ (?:^|/)\. {
+   deny all;
+  }
+
+  location / {
+
+# block common exploits, sql injections etc
+#include /usr/local/nginx/conf/block.conf;
+
+  # Enables directory listings when index file not found
+  #autoindex  on;
+
+  # Shows file listing times as local time
+  #autoindex_localtime on;
+
+  # Enable for vBulletin usage WITHOUT vbSEO installed
+  # More example Nginx vhost configurations at
+  # http://centminmod.com/nginx_configure.html
+  try_files             $uri $uri/ /index.php;
+
+
+  }
+
+##------------------------------ zeus
+location ~ ^(/[^/]+/)?files/(.+) {
+        try_files /wp-content/blogs.dir/$blogid/files/$2 /wp-includes/ms-files.php?file=$2 ;
+        access_log off; log_not_found off; expires max;
+    }
+location ^~ /blogs.dir {
+        internal;
+        alias /var/www/vhosts/example.com/html/content/uploads ;
+        access_log off; log_not_found off; expires max;
+    }
+ if (!-e $request_filename) {
+        rewrite /wp-admin$ $scheme://$host$uri/ permanent;
+        rewrite ^(/[^/]+)?(/wp-.*) $2 last;
+        rewrite ^(/[^/]+)?(/.*\.php) $2 last;
+    }
+##------ zeus ---end -----
+
+ include /usr/local/nginx/conf/staticfiles.conf;
+  include /usr/local/nginx/conf/php.conf;
+  include /usr/local/nginx/conf/drop.conf;
+  #include /usr/local/nginx/conf/errorpage.conf;
+  include /usr/local/nginx/conf/vts_server.conf;
+}
+
+
